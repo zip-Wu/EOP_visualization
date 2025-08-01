@@ -1,5 +1,2 @@
-plotly==6.2.0
-toml==0.10.2
-torch==2.3.1
-torchaudio==2.3.1
-torchvision==0.18.1
+plotly
+torch
