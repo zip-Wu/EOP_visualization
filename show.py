@@ -312,9 +312,9 @@ with st.sidebar:
             with st.expander("skipGRU 参数", expanded=True):
                 col1, col2 = st.columns(2)
                 with col1:
-                    skip_num = st.number_input("SkipGRU数量 (skip_num)", 
-                                             min_value=1, max_value=100, value=66, step=1,
-                                             key="skip_num")
+                    seq_skip = st.number_input("SkipGRU输入序列长度 (seq_skip)", 
+                                             min_value=1, max_value=500, value=200, step=1,
+                                             key="seq_skip")
                     skip_len = st.number_input("SkipGRU跨度 (skip_len)", 
                                              min_value=1, max_value=10, value=3, step=1,
                                              key="skip_len")
@@ -325,6 +325,8 @@ with st.sidebar:
                     skip_hidden = st.number_input("SkipGRU隐藏层大小 (skip_hidden)", 
                                                 min_value=16, max_value=256, value=64, step=16,
                                                 key="skip_hidden")
+            skip_num = seq_skip // skip_len
+        
         
         st.markdown('</div>', unsafe_allow_html=True)  # 关闭模块部分
     
