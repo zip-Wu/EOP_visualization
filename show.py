@@ -240,7 +240,7 @@ with st.sidebar:
     
     # 使用多选下拉框选择模块
     selected_modules = st.multiselect(
-        "选择要使用的模块:",
+        "选择要使用的模块 (至少选择一种模块)",
         options=["Linear", "CNN", "GRU", "skipGRU"],
         default=["Linear", "skipGRU"],
         help="选择要启用的神经网络模块"
@@ -260,16 +260,33 @@ with st.sidebar:
     skip_layer = 0
     skip_hidden = 0
     
+
+    # 预测参数
+    st.markdown('<div class="date-section-title">预测参数</div>', unsafe_allow_html=True)
+    col_pred1, col_pred2 = st.columns(2)
+    with col_pred1:
+        pred_len = st.number_input("预报长度 (pred_len)", 
+                                  min_value=1, max_value=500, value=360, step=1,
+                                  key="pred_len")
+    with col_pred2:
+        seq_len = st.number_input("模型总输入序列长度 (seq_len)", 
+                                min_value=10, max_value=500, value=250, step=1,
+                                key="seq_len")
+    seq_out = st.number_input("滑动窗口单次输出长度 (x ≤ pred_len)", 
+                            min_value=1, max_value=seq_len, value=20, step=1,
+                            key="seq_out")
+    
+
     # 为每个选中的模块创建可折叠的参数区域
     if selected_modules:
-        st.markdown('<div class="module-section">', unsafe_allow_html=True)
+        # st.markdown('<div class="module-section">', unsafe_allow_html=True)
         st.markdown('<div class="module-header">模块参数配置</div>', unsafe_allow_html=True)
         
         # Linear模块参数
         if "Linear" in selected_modules:
             with st.expander("Linear 参数", expanded=True):
-                seq_ar = st.number_input("AR序列长度 (seq_ar)", 
-                                        min_value=0, max_value=500, value=256, step=1,
+                seq_ar = st.number_input("Linear输入序列长度 (seq_linear)", 
+                                        min_value=0, max_value=500, value=200, step=1,
                                         key="seq_ar")
         
         # CNN模块参数
@@ -278,17 +295,17 @@ with st.sidebar:
                 col1, col2 = st.columns(2)
                 with col1:
                     seq_cnn = st.number_input("CNN序列长度 (seq_cnn)", 
-                                            min_value=1, max_value=500, value=256, step=1,
+                                            min_value=1, max_value=500, value=200, step=1,
                                             key="seq_cnn")
                     cnn_kernel = st.number_input("CNN核大小 (cnn_kernel)", 
-                                               min_value=1, max_value=10, value=4, step=1,
+                                               min_value=1, max_value=seq_cnn, value=8, step=1,
                                                key="cnn_kernel")
                 with col2:
                     cnn_stride = st.number_input("CNN步幅 (cnn_stride)", 
-                                               min_value=1, max_value=5, value=1, step=1,
+                                               min_value=1, max_value=seq_cnn, value=8, step=1,
                                                key="cnn_stride")
                     cnn_channel = st.number_input("CNN通道数 (cnn_channel)", 
-                                                min_value=1, max_value=64, value=1, step=1,
+                                                min_value=1, max_value=64, value=8, step=1,
                                                 key="cnn_channel")
         
         # GRU模块参数
@@ -297,14 +314,14 @@ with st.sidebar:
                 col1, col2 = st.columns(2)
                 with col1:
                     seq_gru = st.number_input("GRU序列长度 (seq_gru)", 
-                                            min_value=1, max_value=500, value=256, step=1,
+                                            min_value=1, max_value=500, value=200, step=1,
                                             key="seq_gru")
                     gru_layer = st.number_input("GRU层数 (gru_layer)", 
-                                             min_value=1, max_value=5, value=1, step=1,
+                                             min_value=1, max_value=10, value=1, step=1,
                                              key="gru_layer")
                 with col2:
                     gru_hidden = st.number_input("GRU隐藏层大小 (gru_hidden)", 
-                                               min_value=16, max_value=256, value=64, step=16,
+                                               min_value=8, max_value=1024, value=64, step=8,
                                                key="gru_hidden")
         
         # skipGRU模块参数
@@ -312,45 +329,32 @@ with st.sidebar:
             with st.expander("skipGRU 参数", expanded=True):
                 col1, col2 = st.columns(2)
                 with col1:
-                    seq_skip = st.number_input("SkipGRU输入序列长度 (seq_skip)", 
+                    seq_skip = st.number_input("输入序列长度 (seq_skip)", 
                                              min_value=1, max_value=500, value=200, step=1,
                                              key="seq_skip")
-                    skip_len = st.number_input("SkipGRU跨度 (skip_len)", 
-                                             min_value=1, max_value=10, value=3, step=1,
+                    skip_len = st.number_input("跳跃跨度 (skip_len)", 
+                                             min_value=1, max_value=seq_skip, value=3, step=1,
                                              key="skip_len")
                 with col2:
                     skip_layer = st.number_input("SkipGRU层数 (skip_layer)", 
-                                               min_value=1, max_value=5, value=1, step=1,
+                                               min_value=1, max_value=10, value=1, step=1,
                                                key="skip_layer")
-                    skip_hidden = st.number_input("SkipGRU隐藏层大小 (skip_hidden)", 
-                                                min_value=16, max_value=256, value=64, step=16,
+                    skip_hidden = st.number_input("隐藏层大小 (skip_hidden)", 
+                                                min_value=8, max_value=1024, value=64, step=8,
                                                 key="skip_hidden")
             skip_num = seq_skip // skip_len
         
         
         st.markdown('</div>', unsafe_allow_html=True)  # 关闭模块部分
     
-    # 预测参数
-    st.markdown('<div class="date-section-title">预测参数</div>', unsafe_allow_html=True)
-    col_pred1, col_pred2 = st.columns(2)
-    with col_pred1:
-        pred_len = st.number_input("预报长度 (pred_len)", 
-                                  min_value=100, max_value=500, value=360, step=10,
-                                  key="pred_len")
-    with col_pred2:
-        seq_len = st.number_input("序列长度 (seq_len)", 
-                                min_value=100, max_value=500, value=256, step=10,
-                                key="seq_len")
-    seq_out = st.number_input("单次输出长度 (seq_out)", 
-                            min_value=1, max_value=100, value=20, step=1,
-                            key="seq_out")
+
     
     # 公共参数
-    st.markdown('<div class="date-section-title">公共参数</div>', unsafe_allow_html=True)
+    st.markdown('<div class="date-section-title">公共参数(涉及模块间连接的隐藏参数)</div>', unsafe_allow_html=True)
     col_common1, col_common2 = st.columns(2)
     with col_common1:
-        d_model = st.number_input("模型维度 (d_model)", 
-                                min_value=16, max_value=256, value=64, step=16,
+        d_model = st.number_input("内部解码器维度 (d_model)", 
+                                min_value=8, max_value=256, value=64, step=8,
                                 key="d_model")
     with col_common2:
         dropout = st.number_input("Dropout率", 
@@ -363,15 +367,15 @@ with st.sidebar:
     col_train1, col_train2 = st.columns(2)
     with col_train1:
         num_epoch = st.number_input("训练轮数 (num_epoch)", 
-                                  min_value=1, max_value=100, value=20, step=1,
+                                  min_value=1, max_value=4000, value=20, step=1,
                                   key="num_epoch")
     with col_train2:
         batch_size = st.number_input("批大小 (batch_size)", 
-                                  min_value=8, max_value=128, value=64, step=8,
+                                  min_value=8, max_value=1024, value=64, step=8,
                                   key="batch_size")
     
     # 开始训练按钮
-    train_button = st.button("开始训练", use_container_width=True, key="train_button")
+    train_button = st.button("开始训练", use_container_width=True, key="train_button", type='primary')
 
 
 # 主内容区域
@@ -481,7 +485,7 @@ with st.container():
         st.plotly_chart(fig2, use_container_width=True)
         
         # 显示预测结果表格
-        with st.expander("查看详细预测数据"):
+        with st.expander("查看详细预测数据", expanded=True):
             forecast_df = pd.DataFrame({
                 '日期': forecast_dates,
                 '实测值': y,
