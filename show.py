@@ -75,6 +75,13 @@ st.markdown("""
     .main-content {
         padding: 20px;
     }
+    .mode-section {
+        background-color: #e6f7ff;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #1890ff;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -82,9 +89,47 @@ st.markdown("""
 st.markdown('<div class="header-style">欢迎进入极移预报系统</div>', unsafe_allow_html=True)
 
 # 训练模型函数
-def train_WZPNet(start_time, end_time, EOP, pred_len, seq_len, seq_out, d_model, dropout,
-                 seq_ar, seq_cnn, cnn_kernel, cnn_stride, cnn_channel, seq_gru, gru_layer, gru_hidden,
-                 skip_num, skip_len, skip_layer, skip_hidden, num_epoch, batch_size, progress_bar, status_text):
+def train_WZPNet(module_name, start_time, end_time, EOP, pred_len, seq_len, seq_out, num_epoch, batch_size, progress_bar, status_text):
+    # 根据模块名称设置固定参数
+    d_model = 64
+    dropout = 0.0
+    
+    # 根据模块类型设置固定参数
+    if module_name == "Linear":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = 0
+    elif module_name == "GRU":
+        seq_ar = 0
+        seq_cnn = 0
+        seq_gru = seq_len
+        gru_layer = 1
+        gru_hidden = 64
+        skip_num = 0
+    elif module_name == "skipGRU":
+        seq_ar = 0
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = seq_len // 3
+        skip_len = 3
+        skip_layer = 1
+        skip_hidden = 64
+    elif module_name == "Linear-GRU":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = seq_len
+        gru_layer = 1
+        gru_hidden = 64
+        skip_num = 0
+    elif module_name == "Linear-skipGRU":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = seq_len // 3
+        skip_len = 3
+        skip_layer = 1
+        skip_hidden = 64
     
     # 更新状态
     status_text.text("正在生成数据...")
@@ -104,9 +149,14 @@ def train_WZPNet(start_time, end_time, EOP, pred_len, seq_len, seq_out, d_model,
     # 初始化模型
     status_text.text("正在初始化模型...")
     model = WZPNet(seq_out=seq_out, d_model=d_model, dropout=dropout, seq_ar=seq_ar,
-                seq_cnn=seq_cnn, cnn_kernel=cnn_kernel, cnn_stride=cnn_stride, cnn_channel=cnn_channel,
-                seq_gru=seq_gru, gru_layer=gru_layer, gru_hidden=gru_hidden,
-                skip_num=skip_num, skip_len=skip_len, skip_layer=skip_layer, skip_hidden=skip_hidden).to(device)
+                seq_cnn=0, cnn_kernel=0, cnn_stride=0, cnn_channel=0,  # 固定不使用CNN
+                seq_gru=seq_gru if module_name=='GRU' or module_name=='Linear-GRU' else 0, 
+                gru_layer=gru_layer if module_name=='GRU' or module_name=='Linear-GRU' else 0, 
+                gru_hidden=gru_hidden if module_name=='GRU' or module_name=='Linear-GRU' else 0,
+                skip_num=skip_num if 'skipGRU' in module_name else 0, 
+                skip_len=skip_len if 'skipGRU' in module_name else 0, 
+                skip_layer=skip_layer if 'skipGRU' in module_name else 0, 
+                skip_hidden=skip_hidden if 'skipGRU' in module_name else 0).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
     weights = torch.linspace(1.0, 0.1, steps=seq_out).to(device)
     criterion = WeightedL1Loss(weights)
@@ -122,7 +172,7 @@ def train_WZPNet(start_time, end_time, EOP, pred_len, seq_len, seq_out, d_model,
         # 更新进度和状态
         progress = 15 + int(70 * (epoch + 1) / num_epoch)
         progress_bar.progress(progress)
-        status_text.text(f"训练中... 轮次 {epoch+1}/{num_epoch}")
+        status_text.text(f"训练中... 轮次 {epoch+1}/{num_epoch} (使用 {module_name} 模块)")
         
         model.train()
         train_loss = []
@@ -189,9 +239,109 @@ def train_WZPNet(start_time, end_time, EOP, pred_len, seq_len, seq_out, d_model,
     
     return logs, final
 
+# 使用预训练模型进行预测
+def predict_with_pretrained(module_name, start_time, end_time, EOP, pred_len, seq_len, seq_out, progress_bar, status_text):
+    # 更新状态
+    status_text.text("正在加载预训练模型...")
+    data = gen_data('./data/data_origin.txt', start_time, end_time)
+    LS_weights = None
+    train_data = gen_res(data, EOP, LS_weights)
+    progress_bar.progress(30)
+    
+    # 设置设备
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # 根据模块名称设置固定参数
+    d_model = 64
+    dropout = 0.0
+    
+    if module_name == "Linear":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = 0
+    elif module_name == "GRU":
+        seq_ar = 0
+        seq_cnn = 0
+        seq_gru = seq_len
+        gru_layer = 1
+        gru_hidden = 64
+        skip_num = 0
+    elif module_name == "skipGRU":
+        seq_ar = 0
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = seq_len // 3
+        skip_len = 3
+        skip_layer = 1
+        skip_hidden = 64
+    elif module_name == "Linear-GRU":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = seq_len
+        gru_layer = 1
+        gru_hidden = 64
+        skip_num = 0
+    elif module_name == "Linear-skipGRU":
+        seq_ar = seq_len
+        seq_cnn = 0
+        seq_gru = 0
+        skip_num = seq_len // 3
+        skip_len = 3
+        skip_layer = 1
+        skip_hidden = 64
+    
+    # 初始化模型
+    model = WZPNet(seq_out=seq_out, d_model=d_model, dropout=dropout, seq_ar=seq_ar,
+                seq_cnn=0, cnn_kernel=0, cnn_stride=0, cnn_channel=0,  # 固定不使用CNN
+                seq_gru=seq_gru if 'GRU' in module_name else 0, 
+                gru_layer=gru_layer if 'GRU' in module_name else 0, 
+                gru_hidden=gru_hidden if 'GRU' in module_name else 0,
+                skip_num=skip_num if 'skipGRU' in module_name else 0, 
+                skip_len=skip_len if 'skipGRU' in module_name else 0, 
+                skip_layer=skip_layer if 'skipGRU' in module_name else 0, 
+                skip_hidden=skip_hidden if 'skipGRU' in module_name else 0).to(device)
+    
+    # 加载预训练模型
+    model_path = f"./pretrained_models/{module_name}.pt"
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
+    progress_bar.progress(60)
+    
+    # 生成预测
+    status_text.text("正在生成预测结果...")
+    train_res = torch.tensor(train_data[-seq_len:], dtype=torch.float32).reshape(1, seq_len, 1).to(torch.device(device))
+    _, LS_forecast = LS_fit(data, pred_len, EOP, LS_weights)
+    forecast = []
+    with torch.no_grad():
+        for i in range(pred_len // seq_out):
+            res_output = model(train_res)
+            forecast.append(res_output.view(-1).to('cpu'))
+            train_res = torch.cat((train_res[:, seq_out:, :], res_output.unsqueeze(-1)), dim=1)
+        forecast = np.ravel(np.array(forecast))
+    
+    final = LS_forecast + forecast
+    
+    # 更新进度条
+    progress_bar.progress(100)
+    status_text.text("预测完成！")
+    
+    return final
+
 # 侧边栏参数选择区域
 with st.sidebar:
     st.markdown('<div class="sidebar-title">参数配置</div>', unsafe_allow_html=True)
+    
+    # 模式选择
+    st.markdown('</div>', unsafe_allow_html=True)
+    mode = st.radio(
+        "选择模型模式",
+        ["使用预训练模型", "训练新模型"],
+        index=0,
+        help="选择使用预训练模型或自己训练模型", 
+        horizontal=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # 精简的selectbox，不加框
     st.markdown('<div class="selectbox-compact">', unsafe_allow_html=True)
@@ -235,159 +385,79 @@ with st.sidebar:
             help="选择训练数据的结束日期"
         )
     
-    # 神经网络模块选择
-    st.markdown('<div class="date-section-title">神经网络模块</div>', unsafe_allow_html=True)
-    
-    # 使用多选下拉框选择模块
-    selected_modules = st.multiselect(
-        "选择要使用的模块 (至少选择一种模块)",
-        options=["Linear", "CNN", "GRU", "skipGRU"],
-        default=["Linear", "skipGRU"],
-        help="选择要启用的神经网络模块"
-    )
-    
-    # 初始化模块参数
-    seq_ar = 0
-    seq_cnn = 0
-    cnn_kernel = 0
-    cnn_stride = 0
-    cnn_channel = 0
-    seq_gru = 0
-    gru_layer = 0
-    gru_hidden = 0
-    skip_num = 0
-    skip_len = 0
-    skip_layer = 0
-    skip_hidden = 0
-    
-
     # 预测参数
     st.markdown('<div class="date-section-title">预测参数</div>', unsafe_allow_html=True)
-    col_pred1, col_pred2 = st.columns(2)
-    with col_pred1:
-        pred_len = st.number_input("预报长度 (pred_len)", 
-                                  min_value=1, max_value=500, value=360, step=1,
-                                  key="pred_len")
-    with col_pred2:
-        seq_len = st.number_input("模型总输入序列长度 (seq_len)", 
-                                min_value=10, max_value=500, value=250, step=1,
-                                key="seq_len")
-    seq_out = st.number_input("滑动窗口单次输出长度 (x ≤ pred_len)", 
-                            min_value=1, max_value=seq_len, value=20, step=1,
-                            key="seq_out")
     
-
-    # 为每个选中的模块创建可折叠的参数区域
-    if selected_modules:
-        # st.markdown('<div class="module-section">', unsafe_allow_html=True)
-        st.markdown('<div class="module-header">模块参数配置</div>', unsafe_allow_html=True)
-        
-        # Linear模块参数
-        if "Linear" in selected_modules:
-            with st.expander("Linear 参数", expanded=True):
-                seq_ar = st.number_input("Linear输入序列长度 (seq_linear)", 
-                                        min_value=0, max_value=500, value=200, step=1,
-                                        key="seq_ar")
-        
-        # CNN模块参数
-        if "CNN" in selected_modules:
-            with st.expander("CNN 参数", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    seq_cnn = st.number_input("CNN序列长度 (seq_cnn)", 
-                                            min_value=1, max_value=500, value=200, step=1,
-                                            key="seq_cnn")
-                    cnn_kernel = st.number_input("CNN核大小 (cnn_kernel)", 
-                                               min_value=1, max_value=seq_cnn, value=8, step=1,
-                                               key="cnn_kernel")
-                with col2:
-                    cnn_stride = st.number_input("CNN步幅 (cnn_stride)", 
-                                               min_value=1, max_value=seq_cnn, value=8, step=1,
-                                               key="cnn_stride")
-                    cnn_channel = st.number_input("CNN通道数 (cnn_channel)", 
-                                                min_value=1, max_value=64, value=8, step=1,
-                                                key="cnn_channel")
-        
-        # GRU模块参数
-        if "GRU" in selected_modules:
-            with st.expander("GRU 参数", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    seq_gru = st.number_input("GRU序列长度 (seq_gru)", 
-                                            min_value=1, max_value=500, value=200, step=1,
-                                            key="seq_gru")
-                    gru_layer = st.number_input("GRU层数 (gru_layer)", 
-                                             min_value=1, max_value=10, value=1, step=1,
-                                             key="gru_layer")
-                with col2:
-                    gru_hidden = st.number_input("GRU隐藏层大小 (gru_hidden)", 
-                                               min_value=8, max_value=1024, value=64, step=8,
-                                               key="gru_hidden")
-        
-        # skipGRU模块参数
-        if "skipGRU" in selected_modules:
-            with st.expander("skipGRU 参数", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    seq_skip = st.number_input("输入序列长度 (seq_skip)", 
-                                             min_value=1, max_value=500, value=200, step=1,
-                                             key="seq_skip")
-                    skip_len = st.number_input("跳跃跨度 (skip_len)", 
-                                             min_value=1, max_value=seq_skip, value=3, step=1,
-                                             key="skip_len")
-                with col2:
-                    skip_layer = st.number_input("SkipGRU层数 (skip_layer)", 
-                                               min_value=1, max_value=10, value=1, step=1,
-                                               key="skip_layer")
-                    skip_hidden = st.number_input("隐藏层大小 (skip_hidden)", 
-                                                min_value=8, max_value=1024, value=64, step=8,
-                                                key="skip_hidden")
-            skip_num = seq_skip // skip_len
-        
-        
-        st.markdown('</div>', unsafe_allow_html=True)  # 关闭模块部分
+    # 预报长度
+    pred_len = st.number_input("预报长度 (pred_len)", 
+                              min_value=1, max_value=500, value=360, step=1,
+                              key="pred_len")
     
-
+    # 输入序列长度
+    seq_len = st.number_input("模型总输入序列长度 (seq_len)", 
+                            min_value=10, max_value=500, value=250, step=1,
+                            key="seq_len")
     
-    # 公共参数
-    st.markdown('<div class="date-section-title">公共参数(涉及模块间连接的隐藏参数)</div>', unsafe_allow_html=True)
-    col_common1, col_common2 = st.columns(2)
-    with col_common1:
-        d_model = st.number_input("内部解码器维度 (d_model)", 
-                                min_value=8, max_value=256, value=64, step=8,
-                                key="d_model")
-    with col_common2:
-        dropout = st.number_input("Dropout率", 
-                                min_value=0.0, max_value=1.0, value=0.0, step=0.05,
-                                format="%.2f",
-                                key="dropout")
+    # 滑动窗口选项
+    use_sliding = st.radio("是否使用滑动窗口预测？", 
+                          ["是", "否"], 
+                          index=0,
+                          help="选择'是'时使用滑动窗口预测，选择'否'时一次性输出整个预测序列", horizontal=True)
     
-    # 训练参数
-    st.markdown('<div class="date-section-title">训练参数</div>', unsafe_allow_html=True)
-    col_train1, col_train2 = st.columns(2)
-    with col_train1:
-        num_epoch = st.number_input("训练轮数 (num_epoch)", 
-                                  min_value=1, max_value=4000, value=20, step=1,
-                                  key="num_epoch")
-    with col_train2:
-        batch_size = st.number_input("批大小 (batch_size)", 
-                                  min_value=8, max_value=1024, value=64, step=8,
-                                  key="batch_size")
+    if use_sliding == "是":
+        seq_out = st.number_input("滑动窗口单次输出长度 (seq_out ≤ pred_len)", 
+                                min_value=1, max_value=pred_len, value=20, step=1,
+                                key="seq_out")
+    else:
+        seq_out = pred_len
     
-    # 开始训练按钮
-    train_button = st.button("开始训练", use_container_width=True, key="train_button", type='primary')
-
+    # 根据模式显示不同内容
+    if mode == "使用预训练模型":
+        # 预训练模型选择
+        st.markdown('<div class="date-section-title">模型选择</div>', unsafe_allow_html=True)
+        module_name = st.selectbox(
+            "选择预训练模型",
+            ["Linear", "GRU", "skipGRU", "Linear-GRU", "Linear-skipGRU"],
+            index=0,
+            help="选择要使用的预训练模型"
+        )
+        
+        # 开始预测按钮
+        predict_button = st.button("开始预测", use_container_width=True, key="predict_button", type='primary')
+    else:
+        # 自己训练模型选项
+        st.markdown('<div class="date-section-title">模型选择</div>', unsafe_allow_html=True)
+        module_name = st.selectbox(
+            "选择要训练的模型",
+            ["Linear", "GRU", "skipGRU", "Linear-GRU", "Linear-skipGRU"],
+            index=0,
+            help="选择要训练的神经网络模型"
+        )
+        
+        # 训练参数
+        st.markdown('<div class="date-section-title">训练参数</div>', unsafe_allow_html=True)
+        col_train1, col_train2 = st.columns(2)
+        with col_train1:
+            num_epoch = st.number_input("训练轮数 (num_epoch)", 
+                                      min_value=1, max_value=4000, value=20, step=1,
+                                      key="num_epoch")
+        with col_train2:
+            batch_size = st.number_input("批大小 (batch_size)", 
+                                      min_value=8, max_value=1024, value=64, step=8,
+                                      key="batch_size")
+        
+        # 开始训练按钮
+        train_button = st.button("开始训练", use_container_width=True, key="train_button", type='primary')
 
 # 主内容区域
 with st.container():
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
     
     # 显示当前选择的信息
-    st.success(f"已选择参数: {EOP}, 数据范围: {start_date} 至 {end_date}")
+    st.success(f"已选择参数: {EOP}, 数据范围: {start_date} 至 {end_date}, 模式: {mode}")
     
     # 显示模块选择状态
-    modules = selected_modules if selected_modules else ["无"]
-    st.info(f"当前启用的模块: {', '.join(modules)}")
+    st.info(f"当前选择的模型: {module_name}")
     
     # 初始化结果容器
     result_placeholder = st.empty()
@@ -430,19 +500,24 @@ with st.container():
     # 训练结果区域
     st.subheader("训练与预测结果")
     
-    if train_button:
+    if mode == "训练新模型" and 'train_button' in globals() and train_button:
         # 准备训练
         status_text.text("准备训练中...")
         progress_bar.progress(0)
         
         # 调用训练函数
         logs, forecast_results = train_WZPNet(
-            start_date, end_date, EOP, pred_len, seq_len, seq_out, d_model, dropout,
-            seq_ar, seq_cnn, cnn_kernel, cnn_stride, cnn_channel, 
-            seq_gru, gru_layer, gru_hidden,
-            skip_num, skip_len, skip_layer, skip_hidden, 
-            num_epoch, batch_size,
-            progress_bar, status_text
+            module_name,
+            start_date,
+            end_date,
+            EOP,
+            pred_len,
+            seq_len,
+            seq_out,
+            num_epoch,
+            batch_size,
+            progress_bar,
+            status_text
         )
         
         # 显示训练日志
@@ -476,7 +551,71 @@ with st.container():
             line=dict(color='red', dash='dash')
         ))
         fig2.update_layout(
-            title=f'{EOP} 预测结果',
+            title=f'{EOP} 预测结果 (使用 {module_name} 模型)',
+            xaxis_title='时间',
+            yaxis_title='值',
+            hovermode='x unified',
+            template='plotly_white'
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        # 显示预测结果表格
+        with st.expander("查看详细预测数据", expanded=True):
+            forecast_df = pd.DataFrame({
+                '日期': forecast_dates,
+                '实测值': y,
+                '预测值': forecast_results,
+                '平均绝对误差(mas)': np.abs(y-forecast_results)*1000
+            })
+            st.dataframe(forecast_df)
+    
+    elif mode == "使用预训练模型" and 'predict_button' in globals() and predict_button:
+        # 准备预测
+        status_text.text("准备预测中...")
+        progress_bar.progress(0)
+        
+        # 调用预测函数
+        forecast_results = predict_with_pretrained(
+            module_name,
+            start_date,
+            end_date,
+            EOP,
+            pred_len,
+            seq_len,
+            seq_out,
+            progress_bar,
+            status_text
+        )
+        
+        # 显示预测结果
+        st.success("预测完成！结果如下：")
+        
+        # 创建预测结果的时间序列
+        last_date = t[-1]
+        forecast_dates = pd.date_range(
+            start=last_date + pd.Timedelta(days=1), 
+            periods=len(forecast_results),
+            freq='D'
+        )
+        
+        # 绘制预测结果
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=t[-100:],  # 显示最后100个真实值
+            y=x[-100:],
+            mode='lines',
+            name='历史数据',
+            line=dict(color='blue')
+        ))
+        fig2.add_trace(go.Scatter(
+            x=forecast_dates,
+            y=forecast_results,
+            mode='lines+markers',
+            name='预测结果',
+            line=dict(color='red', dash='dash')
+        ))
+        fig2.update_layout(
+            title=f'{EOP} 预测结果 (使用预训练 {module_name} 模型)',
             xaxis_title='时间',
             yaxis_title='值',
             hovermode='x unified',
