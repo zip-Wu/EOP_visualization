@@ -294,17 +294,17 @@ def predict_with_pretrained(module_name, start_time, end_time, EOP, pred_len, se
     # 初始化模型
     model = WZPNet(seq_out=seq_out, d_model=d_model, dropout=dropout, seq_ar=seq_ar,
                 seq_cnn=0, cnn_kernel=0, cnn_stride=0, cnn_channel=0,  # 固定不使用CNN
-                seq_gru=seq_gru if 'GRU' in module_name else 0, 
-                gru_layer=gru_layer if 'GRU' in module_name else 0, 
-                gru_hidden=gru_hidden if 'GRU' in module_name else 0,
+                seq_gru=seq_gru if module_name=='GRU' or module_name=='Linear-GRU' else 0, 
+                gru_layer=gru_layer if module_name=='GRU' or module_name=='Linear-GRU' else 0, 
+                gru_hidden=gru_hidden if module_name=='GRU' or module_name=='Linear-GRU' else 0,
                 skip_num=skip_num if 'skipGRU' in module_name else 0, 
                 skip_len=skip_len if 'skipGRU' in module_name else 0, 
                 skip_layer=skip_layer if 'skipGRU' in module_name else 0, 
                 skip_hidden=skip_hidden if 'skipGRU' in module_name else 0).to(device)
     
     # 加载预训练模型
-    model_path = f"./pretrained_models/{module_name}.pt"
-    model.load_state_dict(torch.load(model_path))
+    model_path = f"./saved_model/{module_name}.pt"
+    model.load_state_dict(torch.load(model_path, weights_only=True, map_location=torch.device(device)))
     model.eval()
     progress_bar.progress(60)
     
@@ -395,7 +395,7 @@ with st.sidebar:
     
     # 输入序列长度
     seq_len = st.number_input("模型总输入序列长度 (seq_len)", 
-                            min_value=10, max_value=500, value=250, step=1,
+                            min_value=10, max_value=500, value=200, step=1,
                             key="seq_len")
     
     # 滑动窗口选项
