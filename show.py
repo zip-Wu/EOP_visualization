@@ -385,16 +385,15 @@ with st.sidebar:
             help="选择训练数据的结束日期"
         )
     
-    # 预测参数
-    st.markdown('<div class="date-section-title">预测参数</div>', unsafe_allow_html=True)
-    
-    # 预报长度
-    pred_len = st.number_input("预报长度 (pred_len)", 
-                              min_value=1, max_value=500, value=360, step=1,
-                              key="pred_len")
-    
-    # 输入序列长度
-    seq_len = st.number_input("模型总输入序列长度 (seq_len)", 
+    # 输入输出参数
+    st.markdown('<div class="date-section-title">输入输出参数</div>', unsafe_allow_html=True)
+    col_pred1, col_pred2 = st.columns(2)
+    with col_pred1:
+        pred_len = st.number_input("输出预报长度 (pred_len)", 
+                                  min_value=1, max_value=500, value=360, step=1,
+                                  key="pred_len")
+    with col_pred2:
+        seq_len = st.number_input("输入历史序列长度 (seq_len)", 
                             min_value=10, max_value=500, value=200, step=1,
                             key="seq_len")
     
