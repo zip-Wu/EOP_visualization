@@ -356,35 +356,48 @@ with st.sidebar:
         EOP = 'Y'
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 日期选择区域
-    st.markdown('<div class="date-section-title">训练数据范围</div>', unsafe_allow_html=True)
-    
-    # 日期选择器
-    col_date_1, col_date_2 = st.columns(2)
-    
-    min_date = datetime(1962, 1, 1)
-    max_date = datetime(2024, 1, 1)
-    
-    with col_date_1:
-        start_date = st.date_input(
-            "起始日期：", 
-            min_value=min_date, 
-            max_value=max_date, 
-            value=datetime(2004, 1, 1),
-            key="start_date",
-            help="选择训练数据的起始日期"
-        )
-    
-    with col_date_2:
+    if mode == "使用预训练模型":
+        st.markdown('<div class="date-section-title">请选择预报起始日期</div>', unsafe_allow_html=True)
+        min_date = datetime(1982, 1, 1)
+        max_date = datetime(2024, 1, 1)
         end_date = st.date_input(
-            "终止日期：", 
-            min_value=min_date, 
-            max_value=max_date, 
-            value=max_date,
+            "预报起始日期：",
+            min_value=min_date,
+            max_value=max_date,
+            value=datetime(2024, 1, 1),
             key="end_date",
-            help="选择训练数据的结束日期"
+            help="选择预报的起始日期"
         )
+        start_date = end_date - pd.DateOffset(years=20)  # 默认使用过去20年的数据进行预报
+        st.info("注意，当使用预训练模型时，该预训练的模型使用的训练数据集为 2000年1月2日-2020年1月2日 共20年已知数据。", icon="ℹ️")
+    else:
+        # 日期选择区域
+        st.markdown('<div class="date-section-title">训练数据范围</div>', unsafe_allow_html=True)
+        # 日期选择器
+        col_date_1, col_date_2 = st.columns(2)
+        min_date = datetime(1962, 1, 1)
+        max_date = datetime(2024, 1, 1)
+        with col_date_1:
+            start_date = st.date_input(
+                "起始日期：", 
+                min_value=min_date, 
+                max_value=max_date, 
+                value=datetime(2004, 1, 1),
+                key="start_date",
+                help="选择训练数据的起始日期"
+            )
+        with col_date_2:
+            end_date = st.date_input(
+                "终止日期：", 
+                min_value=min_date, 
+                max_value=max_date, 
+                value=max_date,
+                key="end_date",
+                help="选择训练数据的结束日期"
+            )
     
+
+
     # 输入输出参数
     st.markdown('<div class="date-section-title">输入输出参数</div>', unsafe_allow_html=True)
     col_pred1, col_pred2 = st.columns(2)
@@ -452,8 +465,15 @@ with st.sidebar:
 with st.container():
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
     
-    # 显示当前选择的信息
-    st.success(f"已选择参数: {EOP}, 数据范围: {start_date} 至 {end_date}, 模式: {mode}")
+    if mode == "训练新模型":
+        st.warning("注意：训练新模型可能需要较长时间，请耐心等待训练完成。", icon="⚠️")
+        # 显示当前选择的信息
+        st.success(f"已选择参数：PM{EOP}，  \t数据范围: {start_date} 至 {end_date}，  第一个预报点的日期为: {end_date + pd.Timedelta(days=1)}，  \t模式：{mode}")
+    else:
+        st.info("提示：使用预训练模型进行预测，速度较快。", icon="ℹ️")
+        # 显示当前选择的信息
+        st.success(f"已选择参数：PM{EOP}，  \t第一个预报点的日期为: {end_date + pd.Timedelta(days=1)}，  \t模式：{mode}")
+
     
     # 显示模块选择状态
     st.info(f"当前选择的模型: {module_name}")
@@ -476,6 +496,24 @@ with st.container():
     y = np.array(test_data_df[selet_type[EOP]].values.astype(float))
     t = train_data_df.index
     
+    if 'compare_results' not in st.session_state:
+        st.session_state['compare_results'] = []
+    if 'global_model_index' not in st.session_state:
+        st.session_state['global_model_index'] = 1
+
+    # 上下布局：按钮在上，提示在下
+    st.markdown('<div style="display:flex;flex-direction:column;align-items:flex-start;width:100%;">', unsafe_allow_html=True)
+    clear_compare = st.button('🗑️ 清空所有预报', use_container_width=False, key='clear_compare', type='primary', help='点击后清空所有对比结果',)
+    st.markdown('''
+        <div style="background:#e6f7ff;padding:14px 16px 14px 16px;border-radius:6px;border-left:4px solid #1890ff;margin-top:8px;width:100%;min-width:220px;">
+        <span style="color:#1890ff;font-weight:bold;">提示：</span>每次预测会保留上一次预测的结果以提供对比，点击“清空所有预报”按钮后将清空所有先前的预报结果。
+        </div>
+        ''', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    if clear_compare:
+        st.session_state['compare_results'] = []
+        st.session_state['global_model_index'] = 1
+
     # 显示数据图表
     with st.expander("📈 训练数据可视化", expanded=True):
         fig1 = go.Figure(data=go.Scatter(
@@ -497,7 +535,7 @@ with st.container():
         st.plotly_chart(fig1, use_container_width=True)
     
     # 训练结果区域
-    st.subheader("训练与预测结果")
+    st.subheader("预测结果")
     
     if mode == "训练新模型" and 'train_button' in globals() and train_button:
         # 准备训练
@@ -532,6 +570,13 @@ with st.container():
             periods=len(forecast_results),
             freq='D'
         )
+        model_label = f"{module_name}-{st.session_state['global_model_index']}"
+        st.session_state['compare_results'].append({
+            'model': model_label,
+            'forecast': forecast_results.copy(),
+            'dates': forecast_dates,
+        })
+        st.session_state['global_model_index'] += 1
         
         # 绘制预测结果
         fig2 = go.Figure()
@@ -542,13 +587,31 @@ with st.container():
             name='历史数据',
             line=dict(color='blue')
         ))
+        # fig2.add_trace(go.Scatter(
+        #     x=forecast_dates,
+        #     y=forecast_results,
+        #     mode='lines+markers',
+        #     name='预测结果',
+        #     line=dict(color='red', dash='dash')
+        # ))
+        # 新增：预测区间的原始数据虚线
         fig2.add_trace(go.Scatter(
             x=forecast_dates,
-            y=forecast_results,
-            mode='lines+markers',
-            name='预测结果',
-            line=dict(color='red', dash='dash')
+            y=y,
+            mode='lines',
+            name='预测区间实测值',
+            line=dict(color='blue', dash='dot')
         ))
+        # 叠加所有模型预测
+        color_list = ['red', 'green', 'orange', 'purple', 'brown', 'black']
+        for idx, item in enumerate(st.session_state['compare_results']):
+            fig2.add_trace(go.Scatter(
+                x=item['dates'],
+                y=item['forecast'],
+                mode='lines+markers',
+                name=f"{item['model']} 预测",
+                line=dict(color=color_list[idx % len(color_list)], dash='dash', width=2)
+            ))
         fig2.update_layout(
             title=f'{EOP} 预测结果 (使用 {module_name} 模型)',
             xaxis_title='时间',
@@ -596,6 +659,13 @@ with st.container():
             periods=len(forecast_results),
             freq='D'
         )
+        model_label = f"{module_name}-{st.session_state['global_model_index']}"
+        st.session_state['compare_results'].append({
+            'model': model_label,
+            'forecast': forecast_results.copy(),
+            'dates': forecast_dates,
+        })
+        st.session_state['global_model_index'] += 1
         
         # 绘制预测结果
         fig2 = go.Figure()
@@ -606,13 +676,31 @@ with st.container():
             name='历史数据',
             line=dict(color='blue')
         ))
+        # fig2.add_trace(go.Scatter(
+        #     x=forecast_dates,
+        #     y=forecast_results,
+        #     mode='lines+markers',
+        #     name='预测结果',
+        #     line=dict(color='red', dash='dash')
+        # ))
+        # 新增：预测区间的原始数据虚线
         fig2.add_trace(go.Scatter(
             x=forecast_dates,
-            y=forecast_results,
-            mode='lines+markers',
-            name='预测结果',
-            line=dict(color='red', dash='dash')
+            y=y,
+            mode='lines',
+            name='预测区间实测值',
+            line=dict(color='blue', dash='dot')
         ))
+        # 叠加所有模型预测
+        color_list = ['red', 'green', 'orange', 'purple', 'brown', 'black']
+        for idx, item in enumerate(st.session_state['compare_results']):
+            fig2.add_trace(go.Scatter(
+                x=item['dates'],
+                y=item['forecast'],
+                mode='lines+markers',
+                name=f"{item['model']} 预测",
+                line=dict(color=color_list[idx % len(color_list)], dash='dash', width=2)
+            ))
         fig2.update_layout(
             title=f'{EOP} 预测结果 (使用预训练 {module_name} 模型)',
             xaxis_title='时间',
@@ -626,8 +714,8 @@ with st.container():
         with st.expander("查看详细预测数据", expanded=True):
             forecast_df = pd.DataFrame({
                 '日期': forecast_dates,
-                '实测值': y,
-                '预测值': forecast_results,
+                '实测值(mas)': y,
+                '预测值(mas)': forecast_results,
                 '平均绝对误差(mas)': np.abs(y-forecast_results)*1000
             })
             st.dataframe(forecast_df)
