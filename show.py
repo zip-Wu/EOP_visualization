@@ -524,23 +524,51 @@ with st.container():
 
     # 显示数据图表
     with st.expander("📈 训练数据可视化", expanded=True):
-        fig1 = go.Figure(data=go.Scatter(
-            x=t,
-            y=x,
-            mode='lines',
-            line=dict(color='royalblue', width=3),
-            name='时间序列'
-        ))
-        fig1.update_layout(
-            title=f'原始序列(PM{EOP})',
-            xaxis_title='时间',
-            yaxis_title='值(mas)',
-            hovermode='x unified',
-            template='plotly_white',
-            xaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey'),
-            yaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey')
-        )
-        st.plotly_chart(fig1, use_container_width=True)
+        if mode == "使用预训练模型":
+            # 预训练模式下，显示1962-01-01到end_date的原始数据
+            raw_start = datetime(1962, 1, 1)
+            raw_end = end_date
+            raw_data_df = gen_data('./data/data_origin.txt', raw_start, raw_end)
+            t_raw = raw_data_df.index
+            x_raw = np.array(raw_data_df[selet_type[EOP]].values.astype(float))
+            fig1 = go.Figure(data=go.Scatter(
+                x=t_raw,
+                y=x_raw,
+                mode='lines',
+                line=dict(color='royalblue', width=3),
+                name='原始时间序列'
+            ))
+            fig1.update_layout(
+                title=f'原始数据可视化 (PM{EOP})',
+                xaxis_title='时间',
+                yaxis_title='值(mas)',
+                hovermode='x unified',
+                template='plotly_white',
+                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey'),
+                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey')
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+            st.info(f"当前为预训练模型模式，曲线显示区间为 1962-01-01 至 {raw_end}，用于展示原始数据。", icon="ℹ️")
+        else:
+            # 新模型训练模式，显示用户选择的训练数据区间
+            fig1 = go.Figure(data=go.Scatter(
+                x=t,
+                y=x,
+                mode='lines',
+                line=dict(color='royalblue', width=3),
+                name='训练数据时间序列'
+            ))
+            fig1.update_layout(
+                title=f'训练数据可视化 (PM{EOP})',
+                xaxis_title='时间',
+                yaxis_title='值(mas)',
+                hovermode='x unified',
+                template='plotly_white',
+                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey'),
+                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='LightGrey')
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+            st.info(f"当前为新模型训练模式，曲线显示区间为 {start_date} 至 {end_date}，用于展示训练数据。", icon="ℹ️")
     
     # 训练结果区域
     st.subheader("预测结果")
