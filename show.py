@@ -536,13 +536,11 @@ with st.container():
     
     # 训练结果区域
     st.subheader("预测结果")
-    
+
+    # 按钮点击后，append 新结果并立即绘制图像和表格
     if mode == "训练新模型" and 'train_button' in globals() and train_button:
-        # 准备训练
         status_text.text("准备训练中...")
         progress_bar.progress(0)
-        
-        # 调用训练函数
         logs, forecast_results = train_WZPNet(
             module_name,
             start_date,
@@ -556,14 +554,8 @@ with st.container():
             progress_bar,
             status_text
         )
-        
-        # 显示训练日志
         log_container.text_area("训练日志", "\n".join(logs), height=200)
-        
-        # 显示预测结果
         st.success("训练完成！预测结果如下：")
-        
-        # 创建预测结果的时间序列
         last_date = t[-1]
         forecast_dates = pd.date_range(
             start=last_date + pd.Timedelta(days=1), 
@@ -577,24 +569,15 @@ with st.container():
             'dates': forecast_dates,
         })
         st.session_state['global_model_index'] += 1
-        
-        # 绘制预测结果
+        # 绘制图像（包含所有 compare_results，包括刚刚 append 的）
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(
-            x=t[-100:],  # 显示最后100个真实值
+            x=t[-100:],
             y=x[-100:],
             mode='lines',
             name='历史数据',
             line=dict(color='blue')
         ))
-        # fig2.add_trace(go.Scatter(
-        #     x=forecast_dates,
-        #     y=forecast_results,
-        #     mode='lines+markers',
-        #     name='预测结果',
-        #     line=dict(color='red', dash='dash')
-        # ))
-        # 新增：预测区间的原始数据虚线
         fig2.add_trace(go.Scatter(
             x=forecast_dates,
             y=y,
@@ -602,7 +585,6 @@ with st.container():
             name='预测区间实测值',
             line=dict(color='blue', dash='dot')
         ))
-        # 叠加所有模型预测
         color_list = ['red', 'green', 'orange', 'purple', 'brown', 'black']
         for idx, item in enumerate(st.session_state['compare_results']):
             fig2.add_trace(go.Scatter(
@@ -613,14 +595,13 @@ with st.container():
                 line=dict(color=color_list[idx % len(color_list)], dash='dash', width=2)
             ))
         fig2.update_layout(
-            title=f'{EOP} 预测结果 (使用 {module_name} 模型)',
+            title=f'{EOP} 预测结果',
             xaxis_title='时间',
             yaxis_title='值',
             hovermode='x unified',
             template='plotly_white'
         )
         st.plotly_chart(fig2, use_container_width=True)
-        
         # 显示预测结果表格
         with st.expander("查看详细预测数据", expanded=True):
             forecast_df = pd.DataFrame({
@@ -630,13 +611,9 @@ with st.container():
                 '平均绝对误差(mas)': np.abs(y-forecast_results)*1000
             })
             st.dataframe(forecast_df)
-    
     elif mode == "使用预训练模型" and 'predict_button' in globals() and predict_button:
-        # 准备预测
         status_text.text("准备预测中...")
         progress_bar.progress(0)
-        
-        # 调用预测函数
         forecast_results = predict_with_pretrained(
             module_name,
             start_date,
@@ -648,11 +625,7 @@ with st.container():
             progress_bar,
             status_text
         )
-        
-        # 显示预测结果
         st.success("预测完成！结果如下：")
-        
-        # 创建预测结果的时间序列
         last_date = t[-1]
         forecast_dates = pd.date_range(
             start=last_date + pd.Timedelta(days=1), 
@@ -666,24 +639,15 @@ with st.container():
             'dates': forecast_dates,
         })
         st.session_state['global_model_index'] += 1
-        
-        # 绘制预测结果
+        # 绘制图像（包含所有 compare_results，包括刚刚 append 的）
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(
-            x=t[-100:],  # 显示最后100个真实值
+            x=t[-100:],
             y=x[-100:],
             mode='lines',
             name='历史数据',
             line=dict(color='blue')
         ))
-        # fig2.add_trace(go.Scatter(
-        #     x=forecast_dates,
-        #     y=forecast_results,
-        #     mode='lines+markers',
-        #     name='预测结果',
-        #     line=dict(color='red', dash='dash')
-        # ))
-        # 新增：预测区间的原始数据虚线
         fig2.add_trace(go.Scatter(
             x=forecast_dates,
             y=y,
@@ -691,7 +655,6 @@ with st.container():
             name='预测区间实测值',
             line=dict(color='blue', dash='dot')
         ))
-        # 叠加所有模型预测
         color_list = ['red', 'green', 'orange', 'purple', 'brown', 'black']
         for idx, item in enumerate(st.session_state['compare_results']):
             fig2.add_trace(go.Scatter(
@@ -702,14 +665,13 @@ with st.container():
                 line=dict(color=color_list[idx % len(color_list)], dash='dash', width=2)
             ))
         fig2.update_layout(
-            title=f'{EOP} 预测结果 (使用预训练 {module_name} 模型)',
+            title=f'{EOP} 预测结果',
             xaxis_title='时间',
             yaxis_title='值',
             hovermode='x unified',
             template='plotly_white'
         )
         st.plotly_chart(fig2, use_container_width=True)
-        
         # 显示预测结果表格
         with st.expander("查看详细预测数据", expanded=True):
             forecast_df = pd.DataFrame({
@@ -719,7 +681,43 @@ with st.container():
                 '平均绝对误差(mas)': np.abs(y-forecast_results)*1000
             })
             st.dataframe(forecast_df)
-    
+    # 非按钮点击时，只显示历史 compare_results 图像
+    elif st.session_state['compare_results']:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=t[-100:],
+            y=x[-100:],
+            mode='lines',
+            name='历史数据',
+            line=dict(color='blue')
+        ))
+        # 取最后一次预测的 forecast_dates 和 y
+        last_item = st.session_state['compare_results'][-1]
+        forecast_dates = last_item['dates']
+        fig2.add_trace(go.Scatter(
+            x=forecast_dates,
+            y=y,
+            mode='lines',
+            name='预测区间实测值',
+            line=dict(color='blue', dash='dot')
+        ))
+        color_list = ['red', 'green', 'orange', 'purple', 'brown', 'black']
+        for idx, item in enumerate(st.session_state['compare_results']):
+            fig2.add_trace(go.Scatter(
+                x=item['dates'],
+                y=item['forecast'],
+                mode='lines+markers',
+                name=f"{item['model']} 预测",
+                line=dict(color=color_list[idx % len(color_list)], dash='dash', width=2)
+            ))
+        fig2.update_layout(
+            title=f'{EOP} 预测结果',
+            xaxis_title='时间',
+            yaxis_title='值',
+            hovermode='x unified',
+            template='plotly_white'
+        )
+        st.plotly_chart(fig2, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # 底部信息
