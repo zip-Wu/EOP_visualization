@@ -399,29 +399,37 @@ with st.sidebar:
 
 
     # 输入输出参数
-    st.markdown('<div class="date-section-title">输入输出参数</div>', unsafe_allow_html=True)
-    col_pred1, col_pred2 = st.columns(2)
-    with col_pred1:
+    if mode == "使用预训练模型":
+        st.markdown('<div class="date-section-title">输出参数</div>', unsafe_allow_html=True)
         pred_len = st.number_input("输出预报长度 (pred_len)", 
-                                  min_value=1, max_value=500, value=360, step=1,
-                                  key="pred_len")
-    with col_pred2:
-        seq_len = st.number_input("输入历史序列长度 (seq_len)", 
-                            min_value=10, max_value=500, value=200, step=1,
-                            key="seq_len")
-    
-    # 滑动窗口选项
-    use_sliding = st.radio("是否使用滑动窗口预测？", 
-                          ["是", "否"], 
-                          index=0,
-                          help="选择'是'时使用滑动窗口预测，选择'否'时一次性输出整个预测序列", horizontal=True)
-    
-    if use_sliding == "是":
-        seq_out = st.number_input("滑动窗口单次输出长度 (seq_out ≤ pred_len)", 
-                                min_value=1, max_value=pred_len, value=20, step=1,
-                                key="seq_out")
+                                min_value=20, max_value=500, value=360, step=1,
+                                key="pred_len", help="预报最小值为20天")
+        seq_len = 200  # 固定为200
+        seq_out = 20  # 固定为20
+        st.info("注意：使用预训练模型时，输出预报长度 (pred_len) 必须≥20天。", icon="ℹ️")
     else:
-        seq_out = pred_len
+        st.markdown('<div class="date-section-title">输入输出参数</div>', unsafe_allow_html=True)
+        col_pred1, col_pred2 = st.columns(2)
+        with col_pred1:
+            pred_len = st.number_input("输出预报长度 (pred_len)", 
+                                    min_value=1, max_value=500, value=360, step=1,
+                                    key="pred_len")
+        with col_pred2:
+            seq_len = st.number_input("输入历史序列长度 (seq_len)", 
+                                min_value=10, max_value=500, value=200, step=1,
+                                key="seq_len")
+    
+        # 滑动窗口选项
+        use_sliding = st.radio("是否使用滑动窗口预测？", 
+                            ["是", "否"], 
+                            index=0,
+                            help="选择'是'时使用滑动窗口预测，选择'否'时一次性输出整个预测序列", horizontal=True)
+        if use_sliding == "是":
+            seq_out = st.number_input("滑动窗口单次输出长度 (seq_out ≤ pred_len)", 
+                                    min_value=1, max_value=pred_len, value=20, step=1,
+                                    key="seq_out")
+        else:
+            seq_out = pred_len
     
     # 根据模式显示不同内容
     if mode == "使用预训练模型":
